@@ -465,10 +465,20 @@ Dashboard insights:
 st.info(dashboard_summary)
 
 
+recommended_student_insights = """This project forecasts hourly PJME electricity demand using a cleaned time-series dataset from 2002 to 2018. The timestamp column was parsed successfully, the target column PJME_MW was converted to numeric, and missing values were checked before modeling.
+
+The dashboard shows clear electricity demand patterns by hour, month, and year. Hourly demand patterns are important because electricity use changes throughout the day. Monthly demand patterns suggest seasonal variation, which may be linked to heating and cooling needs.
+
+The baseline lag features, especially lag_1 and lag_24, are useful because recent electricity demand and demand at the same hour on the previous day are strong indicators of future demand. The rolling_mean_24 feature helps smooth short-term fluctuations and captures the recent daily average.
+
+A time-based train/test split was used instead of random splitting, which is more appropriate for forecasting because future values should be tested using earlier historical data. The models were compared using MAE, RMSE, and R². RMSE was used as the main comparison metric because large forecasting errors are important in energy demand planning.
+
+The Random Forest model performed better if it had lower MAE and RMSE than the naive lag-1 baseline. This means the model learned useful relationships from the lag, rolling, and calendar features. However, the model can still be improved by adding more features such as holiday indicators, temperature data, peak-hour flags, and more advanced forecasting models."""
+
 student_insights = st.text_area(
     "Student insights and interpretation",
-    value="",
-    height=120,
+    value=recommended_student_insights,
+    height=260,
     help="Write your final project insights after adding models and dashboard visuals.",
 )
 
