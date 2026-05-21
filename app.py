@@ -270,19 +270,108 @@ with st.expander("Baseline feature engineering details"):
     st.write("Students should add their own models, metrics, plots, and insights below.")
 
 st.subheader("6. STUDENT ADDITIONS — MODELING")
-st.info("Add your own time-based split, forecasting models, predictions, and metrics table here.")
-st.code(
-    """
+st.info("This section adds a time-based train/test split, a naive baseline, and a Random Forest model.")
+
 # STUDENT ADDITIONS — MODELING
-# Paste your modeling code below this marker.
-# Required student output:
-#   results_df = a pandas DataFrame containing model names and metrics.
-# Keep a time-based train/test split for forecasting.
+# Time-based train/test split + two forecasting models.
+# This code creates results_df, which is used later in submission.json.
+
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+
 results_df = None
-""",
-    language="python",
-)
-results_df = None
+
+if len(feature_table) > 100:
+    model_df = feature_table.dropna().copy()
+
+    feature_cols = [
+        "lag_1",
+        "lag_24",
+        "rolling_mean_24",
+        "hour",
+        "weekend",
+        "month",
+    ]
+
+    X_model = model_df[feature_cols]
+    y_model = model_df["y_target"]
+
+    # Time-based split: first 80% for training, last 20% for testing.
+    split_index = int(len(model_df) * 0.8)
+
+    X_train = X_model.iloc[:split_index]
+    X_test = X_model.iloc[split_index:]
+    y_train = y_model.iloc[:split_index]
+    y_test = y_model.iloc[split_index:]
+
+    st.write(f"Training rows: {len(X_train):,}")
+    st.write(f"Testing rows: {len(X_test):,}")
+
+    # Model 1: Naive baseline using lag_1.
+    naive_pred = X_test["lag_1"]
+
+    naive_mae = mean_absolute_error(y_test, naive_pred)
+    naive_rmse = float(np.sqrt(mean_squared_error(y_test, naive_pred)))
+    naive_r2 = r2_score(y_test, naive_pred)
+
+    # Model 2: Random Forest Regressor.
+    rf_model = RandomForestRegressor(
+        n_estimators=100,
+        max_depth=12,
+        random_state=42,
+        n_jobs=-1,
+    )
+
+    rf_model.fit(X_train, y_train)
+    rf_pred = rf_model.predict(X_test)
+
+    rf_mae = mean_absolute_error(y_test, rf_pred)
+    rf_rmse = float(np.sqrt(mean_squared_error(y_test, rf_pred)))
+    rf_r2 = r2_score(y_test, rf_pred)
+
+    results_df = pd.DataFrame([
+        {
+            "model": "Naive Lag-1 Baseline",
+            "MAE": float(naive_mae),
+            "RMSE": float(naive_rmse),
+            "R2": float(naive_r2),
+        },
+        {
+            "model": "Random Forest Regressor",
+            "MAE": float(rf_mae),
+            "RMSE": float(rf_rmse),
+            "R2": float(rf_r2),
+        },
+    ])
+
+    st.subheader("Model Metrics Table")
+    st.dataframe(results_df, use_container_width=True)
+
+    comparison_df = pd.DataFrame({
+        "Actual": y_test.values,
+        "Naive Prediction": naive_pred.values,
+        "Random Forest Prediction": rf_pred,
+    })
+
+    st.subheader("Actual vs Predicted Values")
+    st.line_chart(comparison_df.head(300))
+
+    importance_df = pd.DataFrame({
+        "feature": feature_cols,
+        "importance": rf_model.feature_importances_,
+    }).sort_values("importance", ascending=False)
+
+    st.subheader("Random Forest Feature Importance")
+    st.dataframe(importance_df, use_container_width=True)
+    st.bar_chart(importance_df.set_index("feature"))
+
+    best_model_row = results_df.sort_values("RMSE").iloc[0]
+    st.success(
+        f"Best model by RMSE: {best_model_row['model']} "
+        f"(RMSE = {best_model_row['RMSE']:.2f})"
+    )
+else:
+    st.warning("Not enough feature rows for modeling after cleaning and feature engineering.")
 
 st.subheader("7. STUDENT ADDITIONS — DASHBOARD")
 st.info("Add extra dashboard plots, KPIs, and written insights here.")
