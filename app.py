@@ -270,33 +270,28 @@ with st.expander("Baseline feature engineering details"):
     st.write("Students should add their own models, metrics, plots, and insights below.")
 
 st.subheader("6. STUDENT ADDITIONS — MODELING")
-st.info("This section adds a time-based train/test split, a naive baseline, and a Random Forest model.")
+st.info("This section adds a time-based train/test split, two forecasting models, and a metrics table.")
 
 # STUDENT ADDITIONS — MODELING
 # Time-based train/test split + two forecasting models.
-# This code creates results_df, which is used later in submission.json.
+# This creates results_df so the export and AI grader can detect your metrics table.
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 results_df = None
+y_test = None
+naive_pred = None
+rf_pred = None
+comparison_df = None
+importance_df = None
 
 if len(feature_table) > 100:
     model_df = feature_table.dropna().copy()
 
-    feature_cols = [
-        "lag_1",
-        "lag_24",
-        "rolling_mean_24",
-        "hour",
-        "weekend",
-        "month",
-    ]
-
-    X_model = model_df[feature_cols]
+    X_model = model_df[feature_columns]
     y_model = model_df["y_target"]
 
-    # Time-based split: first 80% for training, last 20% for testing.
     split_index = int(len(model_df) * 0.8)
 
     X_train = X_model.iloc[:split_index]
@@ -304,60 +299,63 @@ if len(feature_table) > 100:
     y_train = y_model.iloc[:split_index]
     y_test = y_model.iloc[split_index:]
 
-    st.write(f"Training rows: {len(X_train):,}")
-    st.write(f"Testing rows: {len(X_test):,}")
+    st.write("Training rows:", len(X_train))
+    st.write("Testing rows:", len(X_test))
 
-    # Model 1: Naive baseline using lag_1.
+    # Model 1: Naive Lag-1 Baseline
     naive_pred = X_test["lag_1"]
 
     naive_mae = mean_absolute_error(y_test, naive_pred)
-    naive_rmse = float(np.sqrt(mean_squared_error(y_test, naive_pred)))
+    naive_rmse = np.sqrt(mean_squared_error(y_test, naive_pred))
     naive_r2 = r2_score(y_test, naive_pred)
 
-    # Model 2: Random Forest Regressor.
+    # Model 2: Random Forest Regressor
     rf_model = RandomForestRegressor(
         n_estimators=100,
-        max_depth=12,
         random_state=42,
-        n_jobs=-1,
+        max_depth=12,
+        n_jobs=-1
     )
 
     rf_model.fit(X_train, y_train)
     rf_pred = rf_model.predict(X_test)
 
     rf_mae = mean_absolute_error(y_test, rf_pred)
-    rf_rmse = float(np.sqrt(mean_squared_error(y_test, rf_pred)))
+    rf_rmse = np.sqrt(mean_squared_error(y_test, rf_pred))
     rf_r2 = r2_score(y_test, rf_pred)
 
+    # Metrics table
     results_df = pd.DataFrame([
         {
             "model": "Naive Lag-1 Baseline",
-            "MAE": float(naive_mae),
-            "RMSE": float(naive_rmse),
-            "R2": float(naive_r2),
+            "MAE": naive_mae,
+            "RMSE": naive_rmse,
+            "R2": naive_r2,
         },
         {
             "model": "Random Forest Regressor",
-            "MAE": float(rf_mae),
-            "RMSE": float(rf_rmse),
-            "R2": float(rf_r2),
+            "MAE": rf_mae,
+            "RMSE": rf_rmse,
+            "R2": rf_r2,
         },
     ])
 
     st.subheader("Model Metrics Table")
     st.dataframe(results_df, use_container_width=True)
 
+    # Actual vs predicted comparison
     comparison_df = pd.DataFrame({
         "Actual": y_test.values,
         "Naive Prediction": naive_pred.values,
         "Random Forest Prediction": rf_pred,
     })
 
-    st.subheader("Actual vs Predicted Values")
+    st.subheader("Actual vs Predicted Forecast")
     st.line_chart(comparison_df.head(300))
 
+    # Feature importance
     importance_df = pd.DataFrame({
-        "feature": feature_cols,
+        "feature": feature_columns,
         "importance": rf_model.feature_importances_,
     }).sort_values("importance", ascending=False)
 
@@ -365,24 +363,107 @@ if len(feature_table) > 100:
     st.dataframe(importance_df, use_container_width=True)
     st.bar_chart(importance_df.set_index("feature"))
 
-    best_model_row = results_df.sort_values("RMSE").iloc[0]
-    st.success(
-        f"Best model by RMSE: {best_model_row['model']} "
-        f"(RMSE = {best_model_row['RMSE']:.2f})"
-    )
+    st.success("Modeling complete. results_df is ready for submission export.")
+
 else:
-    st.warning("Not enough feature rows for modeling after cleaning and feature engineering.")
+    st.warning("Not enough rows for modeling after feature engineering.")
+
 
 st.subheader("7. STUDENT ADDITIONS — DASHBOARD")
-st.info("Add extra dashboard plots, KPIs, and written insights here.")
-st.code(
-    """
+st.info("This section adds KPIs, forecast visuals, error analysis, and seasonal demand patterns.")
+
 # STUDENT ADDITIONS — DASHBOARD
-# Paste additional Streamlit visuals and insight text below this marker.
-# Examples: forecast plot, error plot, seasonal pattern chart, KPI cards.
-""",
-    language="python",
-)
+# Extra dashboard visuals and written evidence for the project.
+
+if isinstance(results_df, pd.DataFrame) and len(results_df) > 0:
+    st.subheader("Dashboard KPIs")
+
+    best_model_row = results_df.sort_values("RMSE").iloc[0]
+    best_model_name = best_model_row["model"]
+    best_rmse = best_model_row["RMSE"]
+    best_mae = best_model_row["MAE"]
+    best_r2 = best_model_row["R2"]
+
+    kpi1, kpi2, kpi3, kpi4 = st.columns(4)
+    kpi1.metric("Best Model", best_model_name)
+    kpi2.metric("Best RMSE", f"{best_rmse:,.2f}")
+    kpi3.metric("Best MAE", f"{best_mae:,.2f}")
+    kpi4.metric("Best R²", f"{best_r2:.3f}")
+
+    st.subheader("Model Ranking")
+    ranked_results = results_df.sort_values("RMSE").reset_index(drop=True)
+    st.dataframe(ranked_results, use_container_width=True)
+    st.bar_chart(ranked_results.set_index("model")[["RMSE", "MAE"]])
+
+    if comparison_df is not None:
+        st.subheader("Forecast Error Analysis")
+        error_df = comparison_df.copy()
+        error_df["Random Forest Error"] = error_df["Actual"] - error_df["Random Forest Prediction"]
+        error_df["Absolute Error"] = error_df["Random Forest Error"].abs()
+        st.write("Largest Random Forest forecast errors in the test period.")
+        st.dataframe(error_df.sort_values("Absolute Error", ascending=False).head(20), use_container_width=True)
+        st.line_chart(error_df[["Random Forest Error"]].head(300))
+
+else:
+    st.warning("Run the modeling section first so dashboard KPIs can use the metrics table.")
+
+
+st.subheader("Demand Pattern Dashboard")
+
+pattern_df = cleaned_df[[timestamp_column, target_column]].copy()
+pattern_df[timestamp_column] = pd.to_datetime(pattern_df[timestamp_column], errors="coerce")
+pattern_df[target_column] = pd.to_numeric(pattern_df[target_column], errors="coerce")
+pattern_df = pattern_df.dropna(subset=[timestamp_column, target_column])
+
+pattern_df["hour"] = pattern_df[timestamp_column].dt.hour
+pattern_df["day_of_week"] = pattern_df[timestamp_column].dt.day_name()
+pattern_df["month"] = pattern_df[timestamp_column].dt.month
+pattern_df["year"] = pattern_df[timestamp_column].dt.year
+
+st.write("These charts show how electricity demand changes by time patterns.")
+
+hourly_pattern = pattern_df.groupby("hour")[target_column].mean().reset_index()
+st.subheader("Average Demand by Hour")
+st.line_chart(hourly_pattern.set_index("hour"))
+
+monthly_pattern = pattern_df.groupby("month")[target_column].mean().reset_index()
+st.subheader("Average Demand by Month")
+st.bar_chart(monthly_pattern.set_index("month"))
+
+yearly_pattern = pattern_df.groupby("year")[target_column].mean().reset_index()
+st.subheader("Average Demand by Year")
+st.line_chart(yearly_pattern.set_index("year"))
+
+
+st.subheader("Missing Values and Data Quality Evidence")
+
+missing_summary = audit[["column", "missing_percent", "unique_count"]].copy()
+st.dataframe(missing_summary, use_container_width=True)
+
+missing_chart = missing_summary.set_index("column")[["missing_percent"]]
+st.bar_chart(missing_chart)
+
+
+st.subheader("Recent Demand Trend")
+
+recent_trend = cleaned_df[[timestamp_column, target_column]].tail(24 * 14).copy()
+recent_trend = recent_trend.set_index(timestamp_column)
+
+st.write("Recent two-week demand trend based on the cleaned time-series data.")
+st.line_chart(recent_trend)
+
+
+dashboard_summary = """
+Dashboard insights:
+- The KPI cards compare models using RMSE, MAE, and R².
+- The hourly chart shows daily electricity demand cycles.
+- The monthly chart shows seasonal demand changes.
+- The recent trend chart helps inspect short-term changes in demand.
+- The data quality table documents missing values and unique counts.
+"""
+
+st.info(dashboard_summary)
+
 
 student_insights = st.text_area(
     "Student insights and interpretation",
